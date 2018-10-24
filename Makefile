@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-Wall -std=c++17 -lstdc++fs
+CXXFLAGS=-Wall -std=c++17 -lstdc++fs -pthread
 
 all: filemover
 
