@@ -30,6 +30,6 @@
 *.exe
 *.out
 *.app
-1
-2
+one/*
+two/*
 filemover
