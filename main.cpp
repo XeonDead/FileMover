@@ -10,6 +10,8 @@
 #include <ios>
 #include <sys/stat.h>
 
+#define DELETE
+
 using namespace std;
 namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
 
@@ -96,8 +98,9 @@ void GlueChunks (string* ChunkName, string* OutputFile, int* ChunkSize) {
 int main( int argc , char *argv[ ] ) {
     //initialize empty paths
     std::string inputfile = "", outputfile = "";
-    //std::atomic<int> i;
+    //mutex for thread-locking
     std::mutex mtx;
+    //initial thread count and chunk size
     int thrCount=1;int ChunkSize=0;
     //populate them from command-line
     if (argc > 2)
@@ -116,6 +119,8 @@ int main( int argc , char *argv[ ] ) {
     cout << inputfile << endl;
     cout << outputfile << endl;
     #endif
+    //this is needed since we can accidentally end up with 0 data in chunks
+    if (thrCount>(fs::file_size(inputpath)/2)) {cout << "Chunks too small to contain any data" << endl;; return 1;}; 
     //if file size does not evenly divide in our chunk/thread count, we need to add another chunk/thread
     if ((fs::file_size(inputpath)%thrCount)==0) 
     {ChunkSize = (fs::file_size(inputpath)/thrCount);} 
@@ -135,9 +140,26 @@ int main( int argc , char *argv[ ] ) {
     ofstream offile(outputfile);
     GlueChunks(&outputfile,&outputfile,&ChunkSize);
     //finish up with file system (c++17/boost_file system)
-    //below this line are the last steps we should take
     fs::permissions(outputpath, fs::status(inputpath).permissions(), fs::perm_options::replace);
     fs::last_write_time(outputpath,fs::last_write_time(inputpath));
-    //fs::remove(inputpath); will be once we're sure
+    #ifdef DELETE
+    fs::remove(inputpath);
+    for (int i=0;i<thrCount;i++)
+    {
+        std::string ChunkName;
+        ChunkName.clear();
+        ChunkName.append(outputfile);
+        ChunkName.append(".");
+            std::stringstream temp_str;
+            temp_str<<i;
+            std::string str = temp_str.str();
+            ChunkName.append(str);
+        #ifdef DEBUG
+        cout << ChunkName << endl;
+        #endif
+        fs::path chunkpath=fs::u8path(ChunkName);
+        fs::remove(chunkpath);
+    }
+    #endif
     return 0;
 }
