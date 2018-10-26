@@ -59,38 +59,38 @@ void GlueChunks (string* ChunkName, string* OutputFile, int* ChunkSize, int* thr
         cout << *OutputFile << " opened to write" << endl;
         #endif
 
-		for (int i=0;i<=*thrCount;i++)
+        for (int i=0;i<=*thrCount;i++)
         {
-			// Build the filename
-			fileName.clear();
-			fileName.append(*ChunkName);
-			fileName.append(".");
+            // Build the filename
+            fileName.clear();
+            fileName.append(*ChunkName);
+            fileName.append(".");
             fileName.append(IntToString(i));
 
-			// Open chunk to read
-			ifstream fileInput;
-			fileInput.open(fileName.c_str(), ios::in | ios::binary);
+            // Open chunk to read
+            ifstream fileInput;
+            fileInput.open(fileName.c_str(), ios::in | ios::binary);
             #ifdef DEBUG
             cout << fileName << " opened to read" << endl;
             #endif
 
-			// If chunk opened successfully, read it and write it to the output file.
-			if (fileInput.is_open()) {
+            // If chunk opened successfully, read it and write it to the output file.
+            if (fileInput.is_open()) {
                 //we can work around without chunk size (by checking file size) but it's easier to give it to the function instead
-				char *inputBuffer = new char[*ChunkSize];
-				fileInput.read(inputBuffer,*ChunkSize);
-				outputfile.write(inputBuffer,*ChunkSize);
+                char *inputBuffer = new char[*ChunkSize];
+                fileInput.read(inputBuffer,*ChunkSize);
+                outputfile.write(inputBuffer,*ChunkSize);
                 delete[](inputBuffer);
-				fileInput.close();
-			}
-		}
-		// Close output file.
-		outputfile.close();
+                fileInput.close();
+            }
+        }
+        // Close output file.
+        outputfile.close();
         #ifdef DEBUG
-		cout << "File assembly complete!" << endl;
+        cout << "File assembly complete!" << endl;
         #endif
-	}
-	else { cout << "Error: Unable to open file for output." << endl; }
+    }
+    else { cout << "Error: Unable to open file for output." << endl; }
 }
 
 int main( int argc , char *argv[ ] ) {
