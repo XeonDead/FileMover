@@ -10,12 +10,22 @@
 #include <ios>
 #include <sys/stat.h>
 
-#define DELETE
+#define DEBUG
 
 using namespace std;
 namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
 
+string IntToString(int Int){
+    //this function is written to purely translate int to string without weak conversions (C-like itoa)
+    std::string ResString;
+    std::stringstream temp_str;
+    temp_str<<Int;
+    ResString = temp_str.str();
+    return ResString;
+}
+
 void MakeChunk(int* ChunkNum, int* ChunkSize, string* inputfile, string* outputfile) {
+    //this function grabs a numbered chunk from inputfile and creates it at the destination
     #ifdef DEBUG
     cout << "MakeChunk " << *ChunkNum << endl;
     #endif
@@ -23,22 +33,23 @@ void MakeChunk(int* ChunkNum, int* ChunkSize, string* inputfile, string* outputf
     ofstream ChunkFile;
     ifstream infile(inputfile->c_str());
     string Chunk=*outputfile;
-        Chunk.append(".");
-        std::stringstream temp_str;
-        temp_str<<*ChunkNum;
-        std::string str = temp_str.str();
-        Chunk.append(str);
+    Chunk.append(".");
+    Chunk.append(IntToString(*ChunkNum));
     ChunkFile.open(Chunk.c_str(),ios::out | ios::trunc | ios::binary);
     if (ChunkFile.is_open()) {
-            infile.seekg(*ChunkNum**ChunkSize);
-            infile.read(buffer, *ChunkSize);
-            ChunkFile.write(buffer,infile.gcount());
-            ChunkFile.close();
+        infile.seekg(*ChunkNum**ChunkSize);
+        infile.read(buffer, *ChunkSize);
+        ChunkFile.write(buffer,infile.gcount());
+        ChunkFile.close();
+        #ifdef DEBUG
+        cout << "Chunk " << Chunk << " generated" << endl;
+        #endif
     }
     delete[] buffer;
 }
 
-void GlueChunks (string* ChunkName, string* OutputFile, int* ChunkSize) {
+void GlueChunks (string* ChunkName, string* OutputFile, int* ChunkSize, int* thrCount) {
+    //this function glues the resulting chunks to one output file
     string fileName;
     ofstream outputfile;
     outputfile.open(*OutputFile, ios::out | ios::binary);
@@ -47,22 +58,14 @@ void GlueChunks (string* ChunkName, string* OutputFile, int* ChunkSize) {
         #ifdef DEBUG
         cout << *OutputFile << " opened to write" << endl;
         #endif
-        bool filefound = true;
-		int i = 0;
-        string x;
 
-		while (filefound) {
-			filefound = false;
-
+		for (int i=0;i<=*thrCount;i++)
+        {
 			// Build the filename
 			fileName.clear();
 			fileName.append(*ChunkName);
 			fileName.append(".");
-
-                std::stringstream temp_str;
-                temp_str<<i;
-                std::string str = temp_str.str();
-                fileName.append(str);
+            fileName.append(IntToString(i));
 
 			// Open chunk to read
 			ifstream fileInput;
@@ -71,21 +74,16 @@ void GlueChunks (string* ChunkName, string* OutputFile, int* ChunkSize) {
             cout << fileName << " opened to read" << endl;
             #endif
 
-			// If chunk opened successfully, read it and write it to 
-			// output file.
+			// If chunk opened successfully, read it and write it to the output file.
 			if (fileInput.is_open()) {
-				filefound = true;
+                //we can work around without chunk size (by checking file size) but it's easier to give it to the function instead
 				char *inputBuffer = new char[*ChunkSize];
-
 				fileInput.read(inputBuffer,*ChunkSize);
 				outputfile.write(inputBuffer,*ChunkSize);
-				delete(inputBuffer);
-
+                delete[](inputBuffer);
 				fileInput.close();
 			}
-			i++;
 		}
-
 		// Close output file.
 		outputfile.close();
         #ifdef DEBUG
@@ -101,7 +99,7 @@ int main( int argc , char *argv[ ] ) {
     //mutex for thread-locking
     std::mutex mtx;
     //initial thread count and chunk size
-    int thrCount=1;int ChunkSize=0;
+    int thrCount=5;int ChunkSize=0;
     //populate them from command-line
     if (argc > 2)
     {
@@ -121,13 +119,23 @@ int main( int argc , char *argv[ ] ) {
     #endif
     //this is needed since we can accidentally end up with 0 data in chunks
     if (thrCount>(fs::file_size(inputpath)/2)) {cout << "Chunks too small to contain any data" << endl;; return 1;}; 
-    //if file size does not evenly divide in our chunk/thread count, we need to add another chunk/thread
     if ((fs::file_size(inputpath)%thrCount)==0) 
-    {ChunkSize = (fs::file_size(inputpath)/thrCount);} 
+    {
+        ChunkSize = (fs::file_size(inputpath)/thrCount); 
+    } 
     else 
-    {thrCount++; ChunkSize = (fs::file_size(inputpath)/thrCount);}
-    for (int i=0;i<thrCount;i++) {
-        //critical section - mutex to avoid race condition and multiple chunks of the same data
+    {
+        // If file size does not evenly divide in our chunk/thread count, we add one more byte to the chunk size 
+        // this is taken from consideration where file size divided and multiplied by the thread count always bigger than the file
+        // so if we just extend the chunk a little it would not hurt
+        ChunkSize = (fs::file_size(inputpath)/thrCount)+1; 
+    }
+    //the section above might produce a bogus and empty chunk, but that's the price I'm willing to pay to be sure all the data was taken with
+    #ifdef DEBUG
+    cout << "Size " << ChunkSize << endl;
+    #endif
+    for (int i=0;i<=thrCount;i++) {
+        //critical section - mutex to avoid race condition and multiple creation of the same chunks
         mtx.lock();
         #ifdef DEBUG
         cout << "Thread " << i << endl;
@@ -136,30 +144,28 @@ int main( int argc , char *argv[ ] ) {
         threadsPool[i].join();
         mtx.unlock();
     }
-    //we might need that since we have chunks to merge to it
+    //we need the exitfile since we have chunks to merge to it
     ofstream offile(outputfile);
-    GlueChunks(&outputfile,&outputfile,&ChunkSize);
+    GlueChunks(&outputfile,&outputfile,&ChunkSize,&thrCount);
     //finish up with file system (c++17/boost_file system)
     fs::permissions(outputpath, fs::status(inputpath).permissions(), fs::perm_options::replace);
     fs::last_write_time(outputpath,fs::last_write_time(inputpath));
     #ifdef DELETE
     fs::remove(inputpath);
-    for (int i=0;i<thrCount;i++)
+    #endif
+    for (int i=0;i<=thrCount;i++)
     {
+        //clean up
         std::string ChunkName;
         ChunkName.clear();
         ChunkName.append(outputfile);
         ChunkName.append(".");
-            std::stringstream temp_str;
-            temp_str<<i;
-            std::string str = temp_str.str();
-            ChunkName.append(str);
+        ChunkName.append(IntToString(i));
         #ifdef DEBUG
-        cout << ChunkName << endl;
+        cout << "to del " << ChunkName << endl;
         #endif
         fs::path chunkpath=fs::u8path(ChunkName);
         fs::remove(chunkpath);
     }
-    #endif
     return 0;
 }
