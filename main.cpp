@@ -79,6 +79,9 @@ void MakeChunk(int* ChunkNum, int* ChunkSize, string* InputFile, string* OutputF
 
 void GlueChunks (string* OutputFile, int* ThreadCount) {
     //this function glues the resulting chunks to one output file
+    #ifdef DEBUG
+    cout << "Starting GlueChunks" << endl;
+    #endif
     string fileName;
     ofstream OutFile;
     OutFile.open(*OutputFile, ios::out | ios::binary);
@@ -88,7 +91,7 @@ void GlueChunks (string* OutputFile, int* ThreadCount) {
         cout << *OutputFile << " opened to write" << endl;
         #endif
 
-        for (int i=0;i<=*ThreadCount;i++)
+        for (int i=0;i<*ThreadCount;i++)
         {
             // Build the filename
             fileName.clear();
@@ -166,7 +169,7 @@ int main( int argc , char *argv[ ] ) {
     #ifdef DEBUG
     cout << "Size " << ChunkSize << endl;
     #endif
-    for (int i=0;i<=ThreadCount;i++) {
+    for (int i=0;i<ThreadCount;i++) {
         //critical section - mutex to avoid race condition and multiple creation of the same chunks
         mtx.lock();
         #ifdef DEBUG
@@ -189,7 +192,7 @@ int main( int argc , char *argv[ ] ) {
     #ifndef DEBUG
     fs::remove(InputPath);
     #endif
-    for (int i=0;i<=ThreadCount;i++)
+    for (int i=0;i<ThreadCount;i++)
     {
         //clean up
         string ChunkName;
