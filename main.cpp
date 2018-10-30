@@ -22,6 +22,10 @@ string InvertFile(string *File) {
     ostreambuf_iterator<char> output_begin(output_file);
     vector<char> input_data(input_begin, input_end);
 
+    #ifdef DEBUG
+    cout << "Reversing input file" << endl;
+    #endif
+
     reverse_copy(input_data.begin(), input_data.end(), output_begin);
 
     return "tmpReversedFile";
@@ -29,15 +33,18 @@ string InvertFile(string *File) {
 
 string PreprocessFile(string *OrigFile, int Operation){
     string tmpCompressedFile; string tmpEncryptedFile;
+    #ifdef DEBUG
+    cout << "Starting preprocess with mode " << Operation << endl;
+    #endif
     switch (Operation) {
         //compress+encrypt stub
         case(3):tmpCompressedFile=PreprocessFile(OrigFile,1);
                 tmpEncryptedFile=PreprocessFile(&tmpCompressedFile,2);
                 return tmpEncryptedFile;
         //compress stub
-        case(1):tmpCompressedFile=*OrigFile; return tmpCompressedFile;
+        case(1):return *OrigFile;
         //encrypt stub
-        case(2):tmpEncryptedFile=*OrigFile; return tmpEncryptedFile;
+        case(2):return *OrigFile;
         //invert
         case(4):return InvertFile(OrigFile);
         default: return *OrigFile;
