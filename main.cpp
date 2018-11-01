@@ -14,6 +14,30 @@
 using namespace std;
 namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
 
+class File {
+    public:
+        string Path;
+        fs::path FsPath;
+    File(string Path) {
+        File.FsPath = fs::u8path(Path);
+    }
+    File::MakeChunk();
+}
+
+class InputFile: public File {
+    public:
+        unsigned int Parameters:3;
+        fs::perms FilePermissions;
+    InputFile(string Path) {
+        InputFile.FilePermissions = fs::status(Path).permissions();
+    }
+}
+
+class OutputFile: public File{
+    public:
+    OutputFile::GlueChunks();
+}
+
 string InvertFile(string *File) {
     ifstream input_file(File->c_str(), ios::binary);
     ofstream output_file("tmpReversedFile", ios::binary);
@@ -60,7 +84,7 @@ string IntToString(int Int){
     return ResString;
 }
 
-void MakeChunk(int* ChunkNum, int* ChunkSize, string* InputFile, string* OutputFile) {
+void MakeChunk(const int* ChunkNum, int* ChunkSize, string* InputFile, string* OutputFile) {
     //this function grabs a numbered chunk from InputFile and creates it at the destination
     #ifdef DEBUG
     cout << "MakeChunk " << *ChunkNum << endl;
