@@ -14,6 +14,12 @@
 using namespace std;
 namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
 
+struct {
+    unsigned int compression:1; 
+    unsigned int encryption:1; 
+    unsigned int inversion:1;
+} flags;
+
 class File {
     public:
         string Path;
@@ -21,22 +27,38 @@ class File {
     File(string Path) {
         File.FsPath = fs::u8path(Path);
     }
-    File::MakeChunk();
-}
+};
 
 class InputFile: public File {
     public:
-        unsigned int Parameters:3;
+        struct flags flags;
         fs::perms FilePermissions;
+        list Chunks(File);
     InputFile(string Path) {
-        InputFile.FilePermissions = fs::status(Path).permissions();
+        this.FilePermissions = fs::status(Path).permissions();
+        this.Parameters = 0;
     }
-}
+    InputFile(string Path,struct flags flags) {
+        this.FilePermissions = fs::status(Path).permissions();
+        this.Parameters = Parameters;
+    }
+    InputFile::MakeChunks(InputFile InputFile, struct flags flags){
+        if (flags.inversion==1) {InputFile.InvMakeChunks(InputFile); break;}
+        if (flags.encryption==1) {/*use openssl with some encryption key to preprocess and encrypt the file*/}
+        if (flags.compression==1) {/*boost::iostream::zlib to compress file on the fly*/}
+        /*refactored chunk creation code*/
+    }
+    InputFile::InvMakeChunks(InputFile InputFile){
+        /*reverse chunk creation code*/
+    }
+};
 
 class OutputFile: public File{
     public:
-    OutputFile::GlueChunks();
-}
+    OutputFile::GlueChunks(InputFile.Chunks,OutputFile.Path) {
+        /*refactored GlueChunks from below*/
+    }
+};
 
 string InvertFile(string *File) {
     ifstream input_file(File->c_str(), ios::binary);
