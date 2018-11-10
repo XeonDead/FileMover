@@ -2,6 +2,7 @@
 #include <fstream>
 #include <ios>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <thread>
 #include <mutex>
@@ -153,7 +154,7 @@ int inputFile::MakeChunk(const inputFile* inputFile, const int *ChunkNum, const 
     if (ChunkFile.is_open()) {
         inFile.seekg(*ChunkNum**chunkSize);
         inFile.read(buffer, *chunkSize);
-        if(inputFile->parameters.toInverse){reverse(buffer,buffer+*chunkSize);}//loses data?
+        if(inputFile->parameters.toInverse) {reverse(buffer,buffer+strlen(buffer)); }//no longer loses data with strlen
         ChunkFile.write(buffer,inFile.gcount());
         ChunkFile.close();
         #ifdef DEBUG
@@ -226,8 +227,8 @@ int main( int argc , char *argv[ ] ) {
     ofFile.GlueChunks(&threads);
 
         //finish up with file system (c++17 filesystem/boost_filesystem)
-    //fs::permissions(OutputPath, fs::status(inputFile->path).permissions(), fs::perm_options::replace);
-    //fs::last_write_time(OutputPath,fs::last_write_time(inputFile->path));
+    fs::permissions(ofFile.fspath,inFile.filePermissions, fs::perm_options::replace);
+    fs::last_write_time(ofFile.fspath,inFile.last_write_time);
     #ifndef DEBUG
     fs::remove(inFile.fspath);
     #endif
