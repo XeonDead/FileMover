@@ -30,6 +30,7 @@ class outputFile {
         outputFile(string path){
             this->path=path;
             fspath = fs::u8path(path);
+            //it is expected for the output file to not exist before running the program
         };
         int GlueChunks(const int* threads);
         int GlueInvChunks(const int* threads);
@@ -46,14 +47,18 @@ class inputFile {
         inputFile(string path) {
             this->path=path;
             fspath = fs::u8path(path);
-            filePermissions = fs::status(path).permissions();
-            last_write_time = fs::last_write_time(path);
+            if (fs::exists(fspath)){
+                filePermissions = fs::status(path).permissions();
+                last_write_time = fs::last_write_time(path);
+            } else { throw runtime_error("Input file does not exist"); exit(1); }
         };
         inputFile(string path, int InitParameters) {
             this->path=path;
             fspath = fs::u8path(path);
-            filePermissions = fs::status(path).permissions();
-            last_write_time = fs::last_write_time(path);
+            if (fs::exists(fspath)){
+                filePermissions = fs::status(path).permissions();
+                last_write_time = fs::last_write_time(path);
+            } else { throw runtime_error("Input file does not exist"); exit(1); }
             if (InitParameters==4) {this->parameters.toInverse=true;}
             if (InitParameters==3) {this->parameters.toEncrypt=true;this->parameters.toCompress=true;}
             if (InitParameters==2) {this->parameters.toEncrypt=true;}
@@ -166,9 +171,8 @@ int inputFile::MakeChunk(const inputFile* inputFile, const int *ChunkNum, const 
 };
 
 int main( int argc , char *argv[ ] ) {
-        //initial thread count and chunk size
+        //initial thread count, chunk size and operation mode
     int threads=5; int chunkSize=0; int operationMode=0;
-        //populate them from command-line
     string inPath=""; string ofPath="";
     switch (argc)
     {
