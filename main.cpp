@@ -31,6 +31,8 @@ class outputFile {
             this->path=path;
             fspath = fs::u8path(path);
             //it is expected for the output file to not exist before running the program
+            //unless...
+            if(!fs::exists(fspath.parent_path())) {throw runtime_error("Output folder does not exist"); exit(1);}
         };
         int GlueChunks(const int* threads);
         int GlueInvChunks(const int* threads);
@@ -117,7 +119,7 @@ int outputFile::GlueChunks(const int* threads) {
         cout << "File assembly complete!" << endl;
         #endif
     }
-    else { cout << "Error: Unable to open file for output." << endl; }
+    else { runtime_error("Error: Unable to open file for output."); exit(1); }
     return 0;
 };
 
@@ -216,7 +218,7 @@ int main( int argc , char *argv[ ] ) {
     cout << "outputFile: " <<  ofFile.path << endl;
     #endif
         //this is needed since we can accidentally end up with 0 data in chunks
-    if (threads>(fs::file_size(inFile.path)/2)) {cout << "Chunks too small to contain any data" << endl;; return 1;};
+    if (threads>(fs::file_size(inFile.path)/2)) {throw runtime_error("Chunks too small to contain any data"); exit(1);};
     if ((fs::file_size(inFile.path)%threads)==0)
     {chunkSize = (fs::file_size(inFile.path)/threads); }
     else {chunkSize = (fs::file_size(inFile.path)/threads)+1; }
