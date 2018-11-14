@@ -111,6 +111,11 @@ int outputFile::glueChunks(const int* threads) {
                 delete[](buffer);
                 chunkInputFile.close();
             }
+            #ifdef DEBUG
+            cout << "to del " << chunkFileName << endl;
+            #endif
+            fs::path chunkPath=fs::u8path(chunkFileName);
+            fs::remove(chunkPath);
         }
         // Close output file.
         outputFile.close();
@@ -237,19 +242,5 @@ int main( int argc , char *argv[ ] ) {
     #ifndef DEBUG
     fs::remove(inFile.fspath);
     #endif
-    for (int i=0;i<threads;i++)
-    {
-        //clean up
-        string chunkName;
-        chunkName.clear();
-        chunkName.append(ofFile.path);
-        chunkName.append(".");
-        chunkName.append(to_string(i));
-        #ifdef DEBUG
-        cout << "to del " << chunkName << endl;
-        #endif
-        fs::path chunkpath=fs::u8path(chunkName);
-        fs::remove(chunkpath);
-    }
     return 0;
 }
