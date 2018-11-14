@@ -34,8 +34,7 @@ class outputFile {
             //unless...
             if(!fs::exists(fspath.parent_path())) {throw runtime_error("Output folder does not exist"); exit(1);}
         };
-        int GlueChunks(const int* threads);
-        int GlueInvChunks(const int* threads);
+        int glueChunks(const int* threads);
 };
 
 class inputFile {
@@ -66,14 +65,14 @@ class inputFile {
             if (InitParameters==2) {this->parameters.toEncrypt=true;}
             if (InitParameters==1) {this->parameters.toCompress=true;}
         };
-        int StartMoving(const int* threads, const int* chunkSize, outputFile* outputFile);
-        static int MakeChunk(const inputFile* inputFile, const int *ChunkNum, const int *chunkSize, const outputFile* outputFile);
+        int startMoving(const int* threads, const int* chunkSize, outputFile* outputFile);
+        static int makeChunk(const inputFile* inputFile, const int *chunkNum, const int *chunkSize, const outputFile* outputFile);
 };
 
-int outputFile::GlueChunks(const int* threads) {
+int outputFile::glueChunks(const int* threads) {
     //this function glues the resulting chunks to one output file
     #ifdef DEBUG
-    cout << "Starting GlueChunks" << endl;
+    cout << "Starting glueChunks" << endl;
     #endif
     ofstream outputFile;
     outputFile.open(this->path, ios::out | ios::binary);
@@ -123,7 +122,7 @@ int outputFile::GlueChunks(const int* threads) {
     return 0;
 };
 
-int inputFile::StartMoving(const int* threads, const int* chunkSize, outputFile* outputFile){
+int inputFile::startMoving(const int* threads, const int* chunkSize, outputFile* outputFile){
     if (this->parameters.toInverse) {/*workarounded in code*/}
     if (this->parameters.toEncrypt && this->parameters.toCompress) {/*use both 1 and 2*/}
     if (this->parameters.toEncrypt) {/*use openssl with some encryption key to preprocess and encrypt the file*/}
@@ -138,7 +137,7 @@ int inputFile::StartMoving(const int* threads, const int* chunkSize, outputFile*
         #ifdef DEBUG
         cout << "Thread " << i << endl;
         #endif
-        threadPool[i] = thread(&inputFile::MakeChunk,this,&i,chunkSize,outputFile);
+        threadPool[i] = thread(&inputFile::makeChunk,this,&i,chunkSize,outputFile);
         threadPool[i].join();
         mtx.unlock();
     }
@@ -146,26 +145,26 @@ int inputFile::StartMoving(const int* threads, const int* chunkSize, outputFile*
     return 0;
 };
 
-int inputFile::MakeChunk(const inputFile* inputFile, const int *ChunkNum, const int *chunkSize, const outputFile* outputFile){
+int inputFile::makeChunk(const inputFile* inputFile, const int *chunkNum, const int *chunkSize, const outputFile* outputFile){
     //this function grabs a numbered chunk from inputFile and creates it at the destination
     #ifdef DEBUG
-    cout << "MakeChunk " << *ChunkNum << endl;
+    cout << "makeChunk " << *chunkNum << endl;
     #endif
     char *buffer = new char[*chunkSize];
-    ofstream ChunkFile;
+    ofstream chunkFile;
     ifstream inFile(inputFile->path);
-    string Chunk=outputFile->path;
-    Chunk.append(".");
-    Chunk.append(to_string(*ChunkNum));
-    ChunkFile.open(Chunk.c_str(),ios::out | ios::trunc | ios::binary);
-    if (ChunkFile.is_open()) {
-        inFile.seekg(*ChunkNum**chunkSize);
+    string chunk=outputFile->path;
+    chunk.append(".");
+    chunk.append(to_string(*chunkNum));
+    chunkFile.open(chunk.c_str(),ios::out | ios::trunc | ios::binary);
+    if (chunkFile.is_open()) {
+        inFile.seekg(*chunkNum**chunkSize);
         inFile.read(buffer, *chunkSize);
         if(inputFile->parameters.toInverse) {reverse(buffer,buffer+strlen(buffer)); }//no longer loses data with strlen
-        ChunkFile.write(buffer,inFile.gcount());
-        ChunkFile.close();
+        chunkFile.write(buffer,inFile.gcount());
+        chunkFile.close();
         #ifdef DEBUG
-        cout << "Chunk " << Chunk << " generated" << endl;
+        cout << "chunk " << chunk << " generated" << endl;
         #endif
     }
     delete[] buffer;
@@ -229,8 +228,8 @@ int main( int argc , char *argv[ ] ) {
     cout << "Size " << chunkSize << endl;
     #endif
 
-    inFile.StartMoving(&threads,&chunkSize,&ofFile);
-    ofFile.GlueChunks(&threads);
+    inFile.startMoving(&threads,&chunkSize,&ofFile);
+    ofFile.glueChunks(&threads);
 
         //finish up with file system (c++17 filesystem/boost_filesystem)
     fs::permissions(ofFile.fspath,inFile.filePermissions, fs::perm_options::replace);
@@ -241,15 +240,15 @@ int main( int argc , char *argv[ ] ) {
     for (int i=0;i<threads;i++)
     {
         //clean up
-        string ChunkName;
-        ChunkName.clear();
-        ChunkName.append(ofFile.path);
-        ChunkName.append(".");
-        ChunkName.append(to_string(i));
+        string chunkName;
+        chunkName.clear();
+        chunkName.append(ofFile.path);
+        chunkName.append(".");
+        chunkName.append(to_string(i));
         #ifdef DEBUG
-        cout << "to del " << ChunkName << endl;
+        cout << "to del " << chunkName << endl;
         #endif
-        fs::path chunkpath=fs::u8path(ChunkName);
+        fs::path chunkpath=fs::u8path(chunkName);
         fs::remove(chunkpath);
     }
     return 0;
