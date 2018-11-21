@@ -21,89 +21,99 @@ struct parameters {
     bool toInverse = false;
 };
 
-class outputFile;
-
-class inputFile {
-    protected:
+class file {
+    private:
+        string path;
         fs::path fspath;
         parameters parameters;
         int fileSize; int chunkSize;
     public:
-        string path;
-        inputFile(){};
-        inputFile(const string *path, const int *threads);
-        inputFile(const string *path, const int *InitParameters, const int *threads);
-        int startMoving(const int* threads, outputFile* outputFile);
-        static int makeChunk(const inputFile* inputFile, const int chunkNum, const outputFile* outputFile);
+
+        //expected output file
+        file(string path, int InitParameters);
+        //expected input file
+        file(string path, int InitParameters, int threads);
+        void setPath(const string newPath) {this->path=newPath;this->fspath=fs::u8path(newPath);};
+        string getPath() const {return this->path;};
+        fs::path getFSPath() const {return this->fspath;};
+        
+        int startMoving(const int threads, const file* outputFile);
+        static int makeChunk(const file* inputFile, int chunkNum, const file* outputFile);
+        //^^^^ invokable issue. might not be able to create threads if there's no object - compiler complaint
+        int glueChunks(const int threads);
+        
         fs::perms getPermissions() const {return fs::status(this->path).permissions();};
+        void setPermissions(const fs::perms permissions);
+
         fs::file_time_type getWriteTime() const {return fs::last_write_time(this->path);};
+        void setWriteTime(const fs::file_time_type writeTime);
+        
         int getChunkSize() const {return this->chunkSize;};
         fs::path getFilesystemPath() const {return this->fspath;};
+        int getFileSize() const {return this->fileSize;};
 };
 
-class outputFile {
-    protected:
-        fs::path fspath;
-        parameters parameters;
-    public:
-        string path;
-        outputFile(){};
-        outputFile(const string *path, const int *InitParameters){
-            this->path=*path;
-            fspath = fs::u8path(this->path);
-            //it is expected for the output file to not exist before running the program
-            //unless...
-            if(!fs::exists(fspath.parent_path())) {throw runtime_error("Output folder does not exist");}
-        if (*InitParameters == 4) {this->parameters.toInverse=true;}
-        if (*InitParameters == 3) {this->parameters.toEncrypt=true;this->parameters.toCompress=true;}
-        if (*InitParameters == 2) {this->parameters.toEncrypt=true;}
-        if (*InitParameters == 1) {this->parameters.toCompress=true;}
-        };
-        int glueChunks(const int* threads);
-        void setPermissions(const inputFile* inputFile){
-            fs::permissions(this->fspath,inputFile->getPermissions(), fs::perm_options::replace);
-        }
-        void setWriteTime(const inputFile* inputFile){
-            fs::last_write_time(this->fspath,inputFile->getWriteTime());
-        }
+file::file(string path, int InitParameters) {
+    this->setPath(path);
+    if (fs::exists(this->getFSPath())) {cout << "Output file exists. Overwriting..." <<endl;fs::remove(this->getFSPath());};
+    if (InitParameters == 4) {this->parameters.toInverse=true;}
+    if (InitParameters == 3) {this->parameters.toEncrypt=true;this->parameters.toCompress=true;}
+    if (InitParameters == 2) {this->parameters.toEncrypt=true;}
+    if (InitParameters == 1) {this->parameters.toCompress=true;}
 };
 
-inputFile::inputFile(const string *path, const int *threads) {
-    this->path=*path;
-    fspath = fs::u8path(this->path);
-    if (fs::exists(fspath)){
-        fileSize = fs::file_size(this->path);    
-        if ( *threads > ( fileSize / 2 )) {throw runtime_error("Chunks too small to contain any data"); };
-        if ((fileSize % *threads) == 0) {chunkSize = (fileSize / *threads); }
-        else {chunkSize = (fileSize / *threads)+1; }
-            #ifdef DEBUG
-            cout << "Size " << chunkSize << endl;
-            #endif                
-        // If file size does not evenly divide in our chunk/thread count, we add one more byte to the chunk size
-        // this is taken from consideration where if file size has a modulus after division we can be certain that if chunk size will be bigger it will cover
-        // the entire file so if we just extend the chunk a little it will contain the file entirely
-    } else { throw runtime_error("Input file does not exist"); }
+file::file(string path, int InitParameters, int threads) {
+    this->setPath(path);
+    fileSize = fs::file_size(this->getFSPath());
+    if ((fileSize % threads) == 0) {chunkSize = (fileSize / threads);}
+    else {chunkSize = (fileSize / threads)+1;}
+    if (InitParameters == 4) {this->parameters.toInverse=true;}
+    if (InitParameters == 3) {this->parameters.toEncrypt=true;this->parameters.toCompress=true;}
+    if (InitParameters == 2) {this->parameters.toEncrypt=true;}
+    if (InitParameters == 1) {this->parameters.toCompress=true;}
 };
 
-inputFile::inputFile(const string *path, const int *InitParameters, const int *threads) {
-    this->path=*path;
-    fspath = fs::u8path(this->path);
-    if (fs::exists(fspath)){
-        fileSize = fs::file_size(fspath);
-        if ( *threads > ( fileSize / 2 )) {throw runtime_error("Chunks too small to contain any data"); };
-        if ((fileSize % *threads) == 0) {chunkSize = (fileSize / *threads);}
-        else {chunkSize = (fileSize / *threads)+1;}
-            #ifdef DEBUG
-            cout << "Size " << chunkSize << endl;
-            #endif                
-    } else { throw runtime_error("Input file does not exist"); }
-    if (*InitParameters == 4) {this->parameters.toInverse=true;}
-    if (*InitParameters == 3) {this->parameters.toEncrypt=true;this->parameters.toCompress=true;}
-    if (*InitParameters == 2) {this->parameters.toEncrypt=true;}
-    if (*InitParameters == 1) {this->parameters.toCompress=true;}
+int file::startMoving(const int threads, const file* outputFile){
+    if (this->parameters.toInverse) {/*workarounded in code*/}
+    if (this->parameters.toEncrypt && this->parameters.toCompress) {/*use both 1 and 2*/}
+    if (this->parameters.toEncrypt) {/*use openssl with some encryption key to preprocess and encrypt the file*/}
+    if (this->parameters.toCompress) {/*boost::iostream::zlib to compress file on the fly*/}
+
+    vector<future<int>> threadPool(threads);
+    for (int i=0;i<threads;i++) {
+        threadPool.push_back(async(launch::async,&file::makeChunk,this,i,outputFile));
+    }
+
+    return 0;
 };
 
-int outputFile::glueChunks(const int* threads) {
+int file::makeChunk(const file* inputFile, const int chunkNum, const file* outputFile){
+    //this function grabs a numbered chunk from inputFile and creates it at the destination
+    #ifdef DEBUG
+    cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << endl;
+    #endif
+    char *buffer = new char[inputFile->getChunkSize()];
+    ofstream chunkFile;
+    ifstream inFile(inputFile->path);
+    string chunk=outputFile->path;
+    chunk.append(".");
+    chunk.append(to_string(chunkNum));
+    chunkFile.open(chunk.c_str(),ios::out | ios::trunc | ios::binary);
+    if (chunkFile.is_open()) {
+        inFile.seekg(chunkNum*(inputFile->getChunkSize()));
+        inFile.read(buffer, inputFile->getChunkSize());
+        if(inputFile->parameters.toInverse) {reverse(buffer,buffer+strlen(buffer)); }//no longer loses data with strlen
+        chunkFile.write(buffer,inFile.gcount());
+        chunkFile.close();
+        #ifdef DEBUG
+        cout << "chunk " << chunk << " generated"<< endl;
+        #endif
+    }
+    delete[] buffer;
+    return 0;
+};
+
+int file::glueChunks(const int threads) {
     //this function glues the resulting chunks to one output file
     #ifdef DEBUG
     cout << "Starting glueChunks" << endl;
@@ -116,7 +126,7 @@ int outputFile::glueChunks(const int* threads) {
         cout << this->path << " opened to write" << endl;
         #endif
 
-        for (int i=0;i<*threads;i++)
+        for (int i=0;i<threads;i++)
         {
             // Build the filename
             string chunkFileName;
@@ -124,7 +134,7 @@ int outputFile::glueChunks(const int* threads) {
             chunkFileName.append(this->path);
             chunkFileName.append(".");
             if (this->parameters.toInverse){
-                int j = *threads-i-1;
+                int j = threads-i-1;
                 chunkFileName.append(to_string(j));
             } else chunkFileName.append(to_string(i));
 
@@ -148,8 +158,10 @@ int outputFile::glueChunks(const int* threads) {
             #ifdef DEBUG
             cout << "to del " << chunkFileName << endl;
             #endif
+            #ifndef DEBUG
             fs::path chunkPath=fs::u8path(chunkFileName);
             fs::remove(chunkPath);
+            #endif
         }
         // Close output file.
         outputFile.close();
@@ -157,57 +169,28 @@ int outputFile::glueChunks(const int* threads) {
         cout << "File assembly complete!" << endl;
         #endif
     }
-    else { throw runtime_error("Error: Unable to open file for output.");}
+    else {cout << "Error: Unable to open file for output." << endl; exit(1);}
     return 0;
 };
 
-int inputFile::startMoving(const int* threads, outputFile* outputFile){
-    if (this->parameters.toInverse) {/*workarounded in code*/}
-    if (this->parameters.toEncrypt && this->parameters.toCompress) {/*use both 1 and 2*/}
-    if (this->parameters.toEncrypt) {/*use openssl with some encryption key to preprocess and encrypt the file*/}
-    if (this->parameters.toCompress) {/*boost::iostream::zlib to compress file on the fly*/}
-
-    vector<future<int>> threadPool(*threads);
-    for (int i=0;i<*threads;i++) {
-        threadPool.push_back(async(launch::async,&inputFile::makeChunk,this,i,outputFile));
-    }
-
-    return 0;
+void file::setPermissions(const fs::perms permissions){
+    fs::permissions(this->fspath, permissions, fs::perm_options::replace); 
 };
 
-int inputFile::makeChunk(const inputFile* inputFile, const int chunkNum, const outputFile* outputFile){
-    //this function grabs a numbered chunk from inputFile and creates it at the destination
-    #ifdef DEBUG
-    cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << endl;
-    #endif
-    char *buffer = new char[inputFile->getChunkSize()];
-    ofstream chunkFile;
-    ifstream inFile(inputFile->path);
-    string chunk=outputFile->path;
-    chunk.append(".");
-    chunk.append(to_string(chunkNum));
-    chunkFile.open(chunk.c_str(),ios::out | ios::trunc | ios::binary);
-    if (chunkFile.is_open()) {
-        inFile.seekg(chunkNum*(inputFile->getChunkSize()));
-        inFile.read(buffer, inputFile->getChunkSize());
-        if(inputFile->parameters.toInverse) {reverse(buffer,buffer+strlen(buffer)); }//no longer loses data with strlen
-        chunkFile.write(buffer,inFile.gcount());
-        chunkFile.close();
-        #ifdef DEBUG
-        cout << "chunk " << chunk << " generated" << endl;
-        #endif
-    }
-    delete[] buffer;
-    return 0;
+void file::setWriteTime(const fs::file_time_type writeTime){
+    fs::last_write_time(this->fspath, writeTime);
 };
 
 int main( int argc , char *argv[ ] ) {
-        //initial thread count, chunk size and operation mode
+    //initial thread count, chunk size and operation mode
     int threads=5; int operationMode=0;
     string inPath=""; string ofPath="";
-    if (argc==5) {
-        operationMode=atoi(argv[4]);
-        threads=atoi(argv[3]);
+    if (argc<3) {
+        cout << "Usage: filemover $inputFile $outputFile $threads $operationMode" << endl;
+        cout << "operationMode: 1=compress; 2=encrypt; 3=compress+encrypt; 4=reverse" << endl;
+        return 0;
+    }
+    if (argc==3) {
         ofPath=(argv[2]);
         inPath=(argv[1]);
     }
@@ -216,37 +199,30 @@ int main( int argc , char *argv[ ] ) {
         ofPath=(argv[2]);
         inPath=(argv[1]);
     }
-    if (argc==3) {
+    if (argc==5) {
+        operationMode=atoi(argv[4]);
+        threads=atoi(argv[3]);
         ofPath=(argv[2]);
         inPath=(argv[1]);
     }
-    if (argc<3) {
-        cout << "Usage: filemover $inputFile $outputFile $threads $operationMode" << endl;
-        cout << "operationMode: 1=compress; 2=encrypt; 3=compress+encrypt; 4=reverse" << endl;
-        return 0;
+
+    try {
+        //start sanity checks
+        if (!fs::exists(fs::u8path(inPath))){ throw runtime_error("Input file does not exist\n"); }
+        if (threads > ( fs::file_size( fs::u8path(inPath) ) / 2 )) {throw runtime_error("Chunks too small to contain any data\n"); };
+        if(!fs::exists(fs::u8path(ofPath).parent_path())) {throw runtime_error("Output folder does not exist\n");}
     }
+    catch (exception& e) {cout << e.what(); exit(1);};
 
-    try {inputFile inFile(&inPath,&operationMode,&threads);}
-    catch (exception& e) {e.what(); exit(1);}; 
+    file inFile(inPath,operationMode,threads);
+    file ofFile(ofPath,operationMode);
 
-    inputFile inFile(&inPath,&operationMode,&threads);
-
-    try {outputFile ofFile(&ofPath,&operationMode);}
-    catch (exception& e) {e.what(); exit(1);}; 
-
-    outputFile ofFile(&ofPath,&operationMode);
-
-    #ifdef DEBUG
-    cout << "inputFile: " << inFile.path << endl;
-    cout << "outputFile: " <<  ofFile.path << endl;
-    #endif
-
-    inFile.startMoving(&threads,&ofFile);
-    ofFile.glueChunks(&threads);
+    inFile.startMoving(threads,&ofFile);
+    ofFile.glueChunks(threads);
 
     //finish up with file system (c++17 filesystem/boost_filesystem)
-    ofFile.setPermissions(&inFile);
-    ofFile.setWriteTime(&inFile);
+    ofFile.setPermissions(inFile.getPermissions());
+    ofFile.setWriteTime(inFile.getWriteTime());
     
     #ifndef DEBUG
     fs::remove(inFile.getFilesystemPath());
