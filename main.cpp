@@ -65,35 +65,16 @@ int File::getFileSize() const
   return fileSize_;
 };
 
-File::File(string path, int initParameters) {
-  setPath(path_);
-  if (fs::exists(getFilesystemPath())) {
-  cout << "Output file exists. Overwriting..." <<endl;
-  fs::remove(getFilesystemPath());
-  };
-  if (initParameters == 4) {
-    parameters_.toInverse=true;
-  };
-  if (initParameters == 3) {
-    parameters_.toEncrypt=true;
-    parameters_.toCompress=true;
-  };
-  if (initParameters == 2) {
-    parameters_.toEncrypt=true;
-  };
-  if (initParameters == 1) {
-    parameters_.toCompress=true;
-  };
-};
-
 File::File(string path, int initParameters, int threads) {
   setPath(path);
-  fileSize_ = fs::file_size(getFilesystemPath());
-  if ((fileSize_ % threads) == 0) {
-    chunkSize_ = (fileSize_ / threads);
-  } else {
-    chunkSize_ = (fileSize_ / threads)+1;
-  };
+  if(fs::exists(getFilesystemPath())) {
+    fileSize_ = fs::file_size(getFilesystemPath());
+    if ((fileSize_ % threads) == 0) {
+      chunkSize_ = (fileSize_ / threads);
+    } else {
+      chunkSize_ = (fileSize_ / threads)+1;
+    };
+  }
   if (initParameters == 4) {
     parameters_.toInverse=true;
   };
@@ -253,13 +234,17 @@ int main( int argc , char *argv[ ] ) {
     if(!fs::exists(fs::u8path(ofPath).parent_path())) {
       throw runtime_error("Output folder does not exist\n");
     };
+    if (fs::exists(fs::u8path(ofPath))) {
+      cout << "Output file exists. Overwriting..." <<endl;
+      fs::remove(fs::u8path(ofPath));
+    };
   }
   catch (exception& e) {
     cout << e.what(); exit(1);
   };
 
   File inFile(inPath,operationMode,threads);
-  File ofFile(ofPath,operationMode);
+  File ofFile(ofPath,operationMode,threads);
 
   inFile.startMoving(threads,&ofFile);
   ofFile.glueChunks(threads);

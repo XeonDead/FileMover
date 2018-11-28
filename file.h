@@ -1,4 +1,6 @@
+#ifndef CB_FILE_H
 #define CB_FILE_H
+#endif // CB_FILE_H
 
 struct Parameters {
     bool toCompress = false;
@@ -14,9 +16,6 @@ class File {
         int fileSize_; int chunkSize_;
     public:
 
-        //expected output file
-        File(std::string path, int InitParameters);
-        //expected input file
         File(std::string path, int InitParameters, int threads);
 
         void setPath(const std::string path);
