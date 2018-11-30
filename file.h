@@ -11,7 +11,7 @@ struct Parameters {
 class File {
     private:
         std::string path_;
-        std::filesystem::path fspath_;
+        boost::filesystem::path fspath_;
         Parameters parameters_;
         int fileSize_; int chunkSize_;
     public:
@@ -20,13 +20,13 @@ class File {
 
         void setPath(const std::string path);
         std::string getPath() const;
-        std::filesystem::path getFilesystemPath() const;
+        boost::filesystem::path getFilesystemPath() const;
         
-        std::filesystem::perms getPermissions() const;
-        void setPermissions(const std::filesystem::perms permissions);
+        boost::filesystem::perms getPermissions() const;
+        void setPermissions(const boost::filesystem::perms permissions);
 
-        std::filesystem::file_time_type getWriteTime() const;
-        void setWriteTime(const std::filesystem::file_time_type writeTime);
+        std::time_t getWriteTime() const;
+        void setWriteTime(const std::time_t writeTime);
         
         int getChunkSize() const;
         int getFileSize() const;

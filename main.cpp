@@ -3,56 +3,58 @@
 #include <ios>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
+//#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <future>
 #include <mutex>
 #include <algorithm>
 #include <vector>
 #include <iterator>
+#include <exception>
 
 #ifndef CB_FILE_H
 #include "file.h"
 #endif
 
-//#define DEBUG
+#define DEBUG
 
-using namespace std;
-namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
+//using namespace std;
+//namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
 
 void File::setPath(const std::string path) 
 {
   path_=path;
-  fspath_=std::filesystem::u8path(path);
+  fspath_=boost::filesystem::path(path);
 };
 
-string File::getPath() const 
+std::string File::getPath() const 
 {
   return path_;
 };
 
-fs::path File::getFilesystemPath() const 
+boost::filesystem::path File::getFilesystemPath() const 
 {
   return fspath_;
 };
 
-void File::setPermissions(const fs::perms permissions)
+void File::setPermissions(const boost::filesystem::perms permissions)
 {
-  fs::permissions(fspath_, permissions, fs::perm_options::replace);
+  boost::filesystem::permissions(fspath_, permissions);
 };
 
-fs::perms File::getPermissions() const 
+boost::filesystem::perms File::getPermissions() const 
 {
-  return std::filesystem::status(path_).permissions();
+  return boost::filesystem::status(path_).permissions();
 };
 
-void File::setWriteTime(const fs::file_time_type writeTime)
+void File::setWriteTime(const std::time_t writeTime)
 {
-  fs::last_write_time(fspath_, writeTime);
+  boost::filesystem::last_write_time(fspath_, writeTime);
 };
 
-fs::file_time_type File::getWriteTime() const 
+std::time_t File::getWriteTime() const 
 {
-  return std::filesystem::last_write_time(path_);
+  return boost::filesystem::last_write_time(path_);
 };
 
 int File::getChunkSize() const 
@@ -65,10 +67,10 @@ int File::getFileSize() const
   return fileSize_;
 };
 
-File::File(string path, int initParameters, int threads) {
+File::File(std::string path, int initParameters, int threads) {
   setPath(path);
-  if(fs::exists(getFilesystemPath())) {
-    fileSize_ = fs::file_size(getFilesystemPath());
+  if(boost::filesystem::exists(getFilesystemPath())) {
+    fileSize_ = boost::filesystem::file_size(getFilesystemPath());
     if ((fileSize_ % threads) == 0) {
       chunkSize_ = (fileSize_ / threads);
     } else {
@@ -104,9 +106,9 @@ int File::startMoving(const int threads, const File* outputFile){
     /*boost::iostream::zlib to compress file on the fly*/
   }
 
-  vector<future<int>> threadPool(threads);
+  std::vector<std::future<int>> threadPool(threads);
   for (int i=0;i<threads;i++) {
-    threadPool.push_back(async(launch::async,&File::makeChunk,this,i,outputFile));
+    threadPool.push_back(std::async(std::launch::async,&File::makeChunk,this,i,outputFile));
   };
 
   return 0;
@@ -115,25 +117,25 @@ int File::startMoving(const int threads, const File* outputFile){
 int File::makeChunk(const File* inputFile, const int chunkNum, const File* outputFile){
   //this function grabs a numbered chunk from inputFile and creates it at the destination
   #ifdef DEBUG
-  cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << endl;
+  std::cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << std::endl;
   #endif
   char *buffer = new char[inputFile->getChunkSize()];
-  ofstream chunkFile;
-  ifstream inFile(inputFile->path_);
-  string chunk=outputFile->path_;
+  std::ofstream chunkFile;
+  std::ifstream inFile(inputFile->path_);
+  std::string chunk=outputFile->path_;
   chunk.append(".");
-  chunk.append(to_string(chunkNum));
-  chunkFile.open(chunk.c_str(),ios::out | ios::trunc | ios::binary);
+  chunk.append(std::to_string(chunkNum));
+  chunkFile.open(chunk.c_str(),std::ios::out | std::ios::trunc | std::ios::binary);
   if (chunkFile.is_open()) {
     inFile.seekg(chunkNum*(inputFile->getChunkSize()));
     inFile.read(buffer, inputFile->getChunkSize());
     if(inputFile->parameters_.toInverse) {
-      reverse(buffer,buffer+strlen(buffer)); 
+      std::reverse(buffer,buffer+strlen(buffer)); 
     }//no longer loses data with strlen
     chunkFile.write(buffer,inFile.gcount());
     chunkFile.close();
     #ifdef DEBUG
-    cout << "chunk " << chunk << " generated"<< endl;
+    std::cout << "chunk " << chunk << " generated"<< std::endl;
     #endif
   }
   delete[] buffer;
@@ -143,37 +145,37 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
 int File::glueChunks(const int threads) {
   //this function glues the resulting chunks to one output file
   #ifdef DEBUG
-  cout << "Starting glueChunks" << endl;
+  std::cout << "Starting glueChunks" << std::endl;
   #endif
-  ofstream outputFile;
-  outputFile.open(path_, ios::out | ios::binary);
+  std::ofstream outputFile;
+  outputFile.open(path_, std::ios::out | std::ios::binary);
 
   if (outputFile.is_open()) {
     #ifdef DEBUG
-    cout << path_ << " opened to write" << endl;
+    std::cout << path_ << " opened to write" << std::endl;
     #endif
 
     for (int i=0;i<threads;i++) {
       // Build the filename
-      string chunkFileName;
+      std::string chunkFileName;
       chunkFileName.clear();
       chunkFileName.append(path_);
       chunkFileName.append(".");
       if (parameters_.toInverse) {
         int j = threads-i-1;
-        chunkFileName.append(to_string(j));
-      } else chunkFileName.append(to_string(i));
+        chunkFileName.append(std::to_string(j));
+      } else chunkFileName.append(std::to_string(i));
 
       // Open chunk to read
-      ifstream chunkInputFile;
-      chunkInputFile.open(chunkFileName.c_str(), ios::in | ios::binary);
+      std::ifstream chunkInputFile;
+      chunkInputFile.open(chunkFileName.c_str(), std::ios::in | std::ios::binary);
       #ifdef DEBUG
-      cout << chunkFileName << " opened to read" << endl;
+      std::cout << chunkFileName << " opened to read" << std::endl;
       #endif
 
       // If chunk opened successfully, read it and write it to the output file.
-      if (chunkInputFile.is_open() && fs::file_size(fs::u8path(chunkFileName))!=0) {
-        int chunkSize = fs::file_size(fs::u8path(chunkFileName));
+      if (chunkInputFile.is_open() && boost::filesystem::file_size(boost::filesystem::path(chunkFileName))!=0) {
+        int chunkSize = boost::filesystem::file_size(boost::filesystem::path(chunkFileName));
         char *buffer = new char[chunkSize];
         // After a little brainstorm, using actual chunk size is a better idea
         chunkInputFile.read(buffer,chunkSize);
@@ -182,18 +184,18 @@ int File::glueChunks(const int threads) {
         chunkInputFile.close();
       }
     #ifdef DEBUG
-    cout << "to del " << chunkFileName << endl;
+    std::cout << "to del " << chunkFileName << std::endl;
     #endif
-    fs::path chunkPath=fs::u8path(chunkFileName);
-    fs::remove(chunkPath);
+    boost::filesystem::path chunkPath=boost::filesystem::path(chunkFileName);
+    boost::filesystem::remove(chunkPath);
   }
   // Close output file.
   outputFile.close();
   #ifdef DEBUG
-  cout << "File assembly complete!" << endl;
+  std::cout << "File assembly complete!" << std::endl;
   #endif
   } else {
-    cout << "Error: Unable to open file for output." << endl; exit(1);
+    std::cout << "Error: Unable to open file for output." << std::endl; exit(1);
   }
   return 0;
 };
@@ -201,10 +203,10 @@ int File::glueChunks(const int threads) {
 int main( int argc , char *argv[ ] ) {
   //initial thread count, chunk size and operation mode
   int threads=5; int operationMode=0;
-  string inPath=""; string ofPath="";
+  std::string inPath=""; std::string ofPath="";
   if (argc<3) {
-  cout << "Usage: filemover $inputFile $outputFile $threads $operationMode" << endl;
-  cout << "operationMode: 1=compress; 2=encrypt; 3=compress+encrypt; 4=reverse" << endl;
+  std::cout << "Usage: filemover $inputFile $outputFile $threads $operationMode" << std::endl;
+  std::cout << "operationMode: 1=compress; 2=encrypt; 3=compress+encrypt; 4=reverse" << std::endl;
   return 0;
   }
   if (argc==3) {
@@ -225,22 +227,22 @@ int main( int argc , char *argv[ ] ) {
 
   try {
     //start sanity checks
-    if (!fs::exists(fs::u8path(inPath))){
-      throw runtime_error("Input file does not exist\n"); 
+    if (!boost::filesystem::exists(boost::filesystem::path(inPath))){
+      throw std::runtime_error("Input file does not exist\n"); 
     }
-    if (threads > ( fs::file_size( fs::u8path(inPath) ) / 2 )) {
-      throw runtime_error("Chunks too small to contain any data\n"); 
+    if (threads > ( boost::filesystem::file_size( boost::filesystem::path(inPath) ) / 2 )) {
+      throw std::runtime_error("Chunks too small to contain any data\n"); 
     };
-    if(!fs::exists(fs::u8path(ofPath).parent_path())) {
-      throw runtime_error("Output folder does not exist\n");
+    if(!boost::filesystem::exists(boost::filesystem::path(ofPath).parent_path())) {
+      throw std::runtime_error("Output folder does not exist\n");
     };
-    if (fs::exists(fs::u8path(ofPath))) {
-      cout << "Output file exists. Overwriting..." <<endl;
-      fs::remove(fs::u8path(ofPath));
+    if (boost::filesystem::exists(boost::filesystem::path(ofPath))) {
+      std::cout << "Output file exists. Overwriting..." <<std::endl;
+      boost::filesystem::remove(boost::filesystem::path(ofPath));
     };
   }
-  catch (exception& e) {
-    cout << e.what(); exit(1);
+  catch (std::exception& e) {
+    std::cout << e.what(); exit(1);
   };
 
   File inFile(inPath,operationMode,threads);
@@ -254,7 +256,7 @@ int main( int argc , char *argv[ ] ) {
   ofFile.setWriteTime(inFile.getWriteTime());
   
   #ifndef DEBUG
-  fs::remove(inFile.getFilesystemPath());
+  boost::filesystem::remove(inFile.getFilesystemPath());
   #endif
   return 0;
 }
