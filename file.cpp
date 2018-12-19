@@ -3,7 +3,6 @@
 #include <ios>
 #include <cstdlib>
 #include <cstring>
-//#include <filesystem>
 #include <boost/filesystem.hpp>
 #include <future>
 #include <mutex>
@@ -15,11 +14,6 @@
 #ifndef CB_FILE_H
 #include "file.h"
 #endif
-
-//#define DEBUG
-
-//using namespace std;
-//namespace fs = std::filesystem; //this is c++17 at work, but boost_filesystem is essentially same
 
 void File::setPath(const std::string path) 
 {
@@ -57,18 +51,18 @@ std::time_t File::getWriteTime() const
   return boost::filesystem::last_write_time(path_);
 };
 
-int File::getChunkSize() const 
+unsigned long File::getChunkSize() const
 {
   return chunkSize_;
 };
 
-int File::getFileSize() const 
+unsigned long File::getFileSize() const
 {
   return fileSize_;
 };
 
-File::File(std::string path, int initParameters, int threads) {
-  setPath(path);
+File::File(std::string path, int initParameters, unsigned long threads) {
+  setPath(std::move(path));
   if(boost::filesystem::exists(getFilesystemPath())) {
     fileSize_ = boost::filesystem::file_size(getFilesystemPath());
     if ((fileSize_ % threads) == 0) {
@@ -92,22 +86,22 @@ File::File(std::string path, int initParameters, int threads) {
   };
 };
 
-int File::startMoving(const int threads, const File* outputFile){
+int File::startMoving(const unsigned long threads, const File* outputFile){
   if (parameters_.toInverse) {
-    /*workarounded in code*/
+    /*workaround in code*/
   }
   if (parameters_.toEncrypt && parameters_.toCompress) {
     /*use both 1 and 2*/
   }
   if (parameters_.toEncrypt) {
-    /*use openssl with some encryption key to preprocess and encrypt the file*/
+    /*use openssl with some encryption key to pre-process and encrypt the file*/
   }
   if (parameters_.toCompress) {
     /*boost::iostream::zlib to compress file on the fly*/
   }
 
   std::vector<std::future<int>> threadPool(threads);
-  for (int i=0;i<threads;i++) {
+  for (ulong i=0;i<threads;i++) {
     threadPool.push_back(std::async(std::launch::async,&File::makeChunk,this,i,outputFile));
   };
 
@@ -119,7 +113,7 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
   #ifdef DEBUG
   std::cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << std::endl;
   #endif
-  char *buffer = new char[inputFile->getChunkSize()];
+  auto *buffer = new char[inputFile->getChunkSize()];
   std::ofstream chunkFile;
   std::ifstream inFile(inputFile->path_);
   std::string chunk=outputFile->path_;
@@ -142,7 +136,7 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
   return 0;
 };
 
-int File::glueChunks(const int threads) {
+int File::glueChunks(const unsigned long threads) {
   //this function glues the resulting chunks to one output file
   #ifdef DEBUG
   std::cout << "Starting glueChunks" << std::endl;
@@ -155,14 +149,14 @@ int File::glueChunks(const int threads) {
     std::cout << path_ << " opened to write" << std::endl;
     #endif
 
-    for (int i=0;i<threads;i++) {
+    for (ulong i=0;i<threads;i++) {
       // Build the filename
       std::string chunkFileName;
       chunkFileName.clear();
       chunkFileName.append(path_);
       chunkFileName.append(".");
       if (parameters_.toInverse) {
-        int j = threads-i-1;
+        ulong j = threads-i-1;
         chunkFileName.append(std::to_string(j));
       } else chunkFileName.append(std::to_string(i));
 
@@ -175,11 +169,11 @@ int File::glueChunks(const int threads) {
 
       // If chunk opened successfully, read it and write it to the output file.
       if (chunkInputFile.is_open() && boost::filesystem::file_size(boost::filesystem::path(chunkFileName))!=0) {
-        int chunkSize = boost::filesystem::file_size(boost::filesystem::path(chunkFileName));
-        char *buffer = new char[chunkSize];
+        unsigned long thisChunkSize = boost::filesystem::file_size(boost::filesystem::path(chunkFileName));
+        auto *buffer = new char[thisChunkSize];
         // After a little brainstorm, using actual chunk size is a better idea
-        chunkInputFile.read(buffer,chunkSize);
-        outputFile.write(buffer,chunkSize);
+        chunkInputFile.read(buffer,thisChunkSize);
+        outputFile.write(buffer,thisChunkSize);
         delete[](buffer);
         chunkInputFile.close();
       }

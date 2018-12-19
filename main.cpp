@@ -3,7 +3,6 @@
 #include <ios>
 #include <cstdlib>
 #include <cstring>
-//#include <filesystem>
 #include <boost/filesystem.hpp>
 #include <future>
 #include <mutex>
@@ -16,10 +15,12 @@
 #include "file.h"
 #endif
 
+//#define DEBUG
+
 int main( int argc , char *argv[ ] ) {
-  //initial thread count, chunk size and operation mode
-  unsigned int threads=5; int operationMode=0;
-  std::string inPath=""; std::string ofPath="";
+  //initial thread count and operation mode
+  unsigned long threads=5; long operationMode=0;
+  std::string inPath; std::string ofPath;
   if (argc<3) {
   std::cout << "Usage: filemover $inputFile $outputFile $threads $operationMode" << std::endl;
   std::cout << "operationMode: 1=compress; 2=encrypt; 3=compress+encrypt; 4=reverse" << std::endl;
@@ -30,13 +31,13 @@ int main( int argc , char *argv[ ] ) {
     inPath=(argv[1]);
   }
   if (argc==4) {
-    threads=atoi(argv[3]);
+    threads=strtoul(argv[3],nullptr,0);
     ofPath=(argv[2]);
     inPath=(argv[1]);
   }
   if (argc==5) {
-    operationMode=atoi(argv[4]);
-    threads=atoi(argv[3]);
+    operationMode=strtol(argv[4],nullptr,0);
+    threads=strtoul(argv[3],nullptr,0);
     ofPath=(argv[2]);
     inPath=(argv[1]);
   }
