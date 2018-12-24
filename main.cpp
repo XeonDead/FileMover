@@ -51,7 +51,7 @@ int main( int argc , char *argv[ ] ) {
       throw std::runtime_error("Chunks too small to contain any data\n"); 
     };
     if(!boost::filesystem::exists(boost::filesystem::path(ofPath).parent_path())) {
-      throw std::runtime_error("Output folder does not exist\n");
+      throw std::runtime_error("Please create output folder or specify absolute path\n");
     };
     if (boost::filesystem::exists(boost::filesystem::path(ofPath))) {
       std::cout << "Output file exists. Overwriting..." <<std::endl;

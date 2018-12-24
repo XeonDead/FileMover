@@ -15,6 +15,8 @@
 #include "file.h"
 #endif
 
+//#define DEBUG
+
 void File::setPath(const std::string path) 
 {
   path_=path;
@@ -100,9 +102,12 @@ int File::startMoving(const unsigned long threads, const File* outputFile){
     /*boost::iostream::zlib to compress file on the fly*/
   }
 
-  std::vector<std::future<int>> threadPool(threads);
+  std::vector<std::thread> threadPool;
   for (ulong i=0;i<threads;i++) {
-    threadPool.push_back(std::async(std::launch::async,&File::makeChunk,this,i,outputFile));
+    threadPool.emplace_back(std::thread(&File::makeChunk,this,i,outputFile));
+  };
+  for (ulong i=0;i<threads;i++) {
+    threadPool[i].join();
   };
 
   return 0;
