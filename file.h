@@ -13,7 +13,9 @@ class File {
     std::string path_;
     boost::filesystem::path fspath_;
     Parameters parameters_;
-    unsigned long fileSize_; unsigned long chunkSize_;
+    unsigned long fileSize_;
+    unsigned long chunkSize_;
+    unsigned long transferSize_;
   public:
     File(std::string path, int InitParameters, unsigned long threads);
 
@@ -29,6 +31,7 @@ class File {
         
     unsigned long getChunkSize() const;
     unsigned long getFileSize() const;
+    unsigned long getTransferSize() const;
 
     int startMoving(unsigned long threads, const File* outputFile);
     static int makeChunk(const File* inputFile, int chunkNum, const File* outputFile);

@@ -63,6 +63,11 @@ unsigned long File::getFileSize() const
   return fileSize_;
 };
 
+unsigned long File::getTransferSize() const
+{
+  return transferSize_;
+};
+
 File::File(std::string path, int initParameters, unsigned long threads) {
   setPath(std::move(path));
   if(boost::filesystem::exists(getFilesystemPath())) {
@@ -73,6 +78,12 @@ File::File(std::string path, int initParameters, unsigned long threads) {
       chunkSize_ = (fileSize_ / threads)+1;
     };
   }
+  if (fileSize_ > 1048576) { transferSize_ = 1048576;}  //2^20, 1mb chunk
+    else if (fileSize_ > 1024) { transferSize_ = 1024;} //2^10 1kb chunk
+      else transferSize_ = chunkSize_; //small enough to fit in memory
+  #ifdef DEBUG
+    //std::cout << "Transfer Size is:" << transferSize_ << std::endl;
+  #endif
   if (initParameters == 4) {
     parameters_.toInverse=true;
   };
@@ -118,7 +129,8 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
   #ifdef DEBUG
   std::cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << std::endl;
   #endif
-  auto *buffer = new char[inputFile->getChunkSize()];
+  int fullChunkSize=inputFile->getChunkSize();
+  int transferSize=inputFile->getTransferSize();
   std::ofstream chunkFile;
   std::ifstream inFile(inputFile->path_);
   std::string chunk=outputFile->path_;
@@ -126,18 +138,24 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
   chunk.append(std::to_string(chunkNum));
   chunkFile.open(chunk.c_str(),std::ios::out | std::ios::trunc | std::ios::binary);
   if (chunkFile.is_open()) {
-    inFile.seekg(chunkNum*(inputFile->getChunkSize()));
-    inFile.read(buffer, inputFile->getChunkSize());
-    if(inputFile->parameters_.toInverse) {
-      std::reverse(buffer,buffer+strlen(buffer)); 
-    }//no longer loses data with strlen
-    chunkFile.write(buffer,inFile.gcount());
+    inFile.seekg(chunkNum*fullChunkSize);
+    for (int i=0;i<fullChunkSize;i+=transferSize){
+      auto *buffer = new char[transferSize];
+      inFile.read(buffer, transferSize);
+        if(inputFile->parameters_.toInverse) {
+          std::reverse(buffer,buffer+strlen(buffer));
+        }//no longer loses data with strlen
+      #ifdef DEBUG
+	//std::cout << "Put " << i << " crabs in bucket" << std::endl;
+      #endif
+      chunkFile.write(buffer,transferSize);
+      delete[] buffer;
+    }
     chunkFile.close();
     #ifdef DEBUG
     std::cout << "chunk " << chunk << " generated"<< std::endl;
     #endif
   }
-  delete[] buffer;
   return 0;
 };
 
