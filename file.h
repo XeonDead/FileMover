@@ -17,7 +17,7 @@ class File {
     unsigned long chunkSize_;
     unsigned long transferSize_;
   public:
-    File(std::string path, int InitParameters, unsigned long threads);
+    File(std::string path, long InitParameters, unsigned long threads);
 
     void setPath(std::string path);
     std::string getPath() const;

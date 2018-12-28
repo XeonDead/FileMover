@@ -1,15 +1,8 @@
 #include <iostream>
 #include <fstream>
-#include <ios>
-#include <cstdlib>
 #include <cstring>
 #include <boost/filesystem.hpp>
 #include <future>
-#include <mutex>
-#include <algorithm>
-#include <vector>
-#include <iterator>
-#include <exception>
 
 #ifndef CB_FILE_H
 #include "file.h"
@@ -71,8 +64,8 @@ int main( int argc , char *argv[ ] ) {
   //finish up with file system (c++17 filesystem/boost_filesystem)
   ofFile.setPermissions(inFile.getPermissions());
   ofFile.setWriteTime(inFile.getWriteTime());
-  
-  #ifndef DEBUG
+
+#ifndef MY_DEBUG
   boost::filesystem::remove(inFile.getFilesystemPath());
   #endif
   return 0;

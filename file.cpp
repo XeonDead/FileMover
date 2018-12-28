@@ -1,15 +1,8 @@
 #include <iostream>
 #include <fstream>
-#include <ios>
-#include <cstdlib>
 #include <cstring>
 #include <boost/filesystem.hpp>
 #include <future>
-#include <mutex>
-#include <algorithm>
-#include <vector>
-#include <iterator>
-#include <exception>
 
 #ifndef CB_FILE_H
 #include "file.h"
@@ -68,7 +61,7 @@ unsigned long File::getTransferSize() const
   return transferSize_;
 };
 
-File::File(std::string path, int initParameters, unsigned long threads) {
+File::File(std::string path, long initParameters, unsigned long threads) {
   setPath(std::move(path));
   if(boost::filesystem::exists(getFilesystemPath())) {
     fileSize_ = boost::filesystem::file_size(getFilesystemPath());
@@ -78,12 +71,12 @@ File::File(std::string path, int initParameters, unsigned long threads) {
       chunkSize_ = (fileSize_ / threads)+1;
     };
   }
-  if (fileSize_ > 1048576) { transferSize_ = 1048576;}  //2^20, 1mb chunk
-    else if (fileSize_ > 1024) { transferSize_ = 1024;} //2^10 1kb chunk
-      else transferSize_ = chunkSize_; //small enough to fit in memory
-  #ifdef DEBUG
-    //std::cout << "Transfer Size is:" << transferSize_ << std::endl;
-  #endif
+  if (fileSize_ > 104857600) {transferSize_ = 10485760;} //2^20, 10mb chunk for files >100mb
+  else
+  if (fileSize_ > 10485760) {transferSize_ = 1048576;} //2^20, 1mb chunk for files >10mb
+  else
+  if (fileSize_ > 10240) {transferSize_ = 1024;} //2^10 1kb chunk for files between 10kb and 10mb
+  else {transferSize_ = chunkSize_;}; //small enough to fit in memory
   if (initParameters == 4) {
     parameters_.toInverse=true;
   };
@@ -126,11 +119,9 @@ int File::startMoving(const unsigned long threads, const File* outputFile){
 
 int File::makeChunk(const File* inputFile, const int chunkNum, const File* outputFile){
   //this function grabs a numbered chunk from inputFile and creates it at the destination
-  #ifdef DEBUG
-  std::cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << std::endl;
+  #ifdef MY_DEBUG
+    std::cout << "start work on chunk number " << chunkNum << " thread " << std::this_thread::get_id() << std::endl;
   #endif
-  int fullChunkSize=inputFile->getChunkSize();
-  int transferSize=inputFile->getTransferSize();
   std::ofstream chunkFile;
   std::ifstream inFile(inputFile->path_);
   std::string chunk=outputFile->path_;
@@ -138,22 +129,30 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
   chunk.append(std::to_string(chunkNum));
   chunkFile.open(chunk.c_str(),std::ios::out | std::ios::trunc | std::ios::binary);
   if (chunkFile.is_open()) {
-    inFile.seekg(chunkNum*fullChunkSize);
-    for (int i=0;i<fullChunkSize;i+=transferSize){
-      auto *buffer = new char[transferSize];
-      inFile.read(buffer, transferSize);
+    inFile.seekg(chunkNum * (inputFile->getChunkSize()));
+    for (long i = inputFile->getChunkSize(); i > 0; i -= inputFile->getTransferSize()) {
+      if (i > inputFile->getTransferSize()) {
+        auto *buffer = new char[inputFile->getTransferSize()];
+        inFile.read(buffer, inputFile->getTransferSize());
+        if (inputFile->parameters_.toInverse) {
+          std::reverse(buffer, buffer + strlen(buffer));
+        }//no longer loses data with strlen
+        chunkFile.write(buffer, inFile.gcount());
+        delete[] buffer;
+      } else {
+        auto *buffer = new char[i];
+        inFile.read(buffer, i);
         if(inputFile->parameters_.toInverse) {
           std::reverse(buffer,buffer+strlen(buffer));
         }//no longer loses data with strlen
-      #ifdef DEBUG
-	//std::cout << "Put " << i << " crabs in bucket" << std::endl;
-      #endif
-      chunkFile.write(buffer,transferSize);
-      delete[] buffer;
+        chunkFile.write(buffer, inFile.gcount());
+        delete[] buffer;
+      }
+      //those two blocks represent situation where we don't want to get excessive data after our chunk end
     }
     chunkFile.close();
-    #ifdef DEBUG
-    std::cout << "chunk " << chunk << " generated"<< std::endl;
+#ifdef MY_DEBUG
+    std::cout << "chunk " << chunk << " generated" << std::endl;
     #endif
   }
   return 0;
@@ -161,14 +160,14 @@ int File::makeChunk(const File* inputFile, const int chunkNum, const File* outpu
 
 int File::glueChunks(const unsigned long threads) {
   //this function glues the resulting chunks to one output file
-  #ifdef DEBUG
+#ifdef MY_DEBUG
   std::cout << "Starting glueChunks" << std::endl;
   #endif
   std::ofstream outputFile;
   outputFile.open(path_, std::ios::out | std::ios::binary);
 
   if (outputFile.is_open()) {
-    #ifdef DEBUG
+#ifdef MY_DEBUG
     std::cout << path_ << " opened to write" << std::endl;
     #endif
 
@@ -186,7 +185,7 @@ int File::glueChunks(const unsigned long threads) {
       // Open chunk to read
       std::ifstream chunkInputFile;
       chunkInputFile.open(chunkFileName.c_str(), std::ios::in | std::ios::binary);
-      #ifdef DEBUG
+#ifdef MY_DEBUG
       std::cout << chunkFileName << " opened to read" << std::endl;
       #endif
 
@@ -200,7 +199,7 @@ int File::glueChunks(const unsigned long threads) {
         delete[](buffer);
         chunkInputFile.close();
       }
-    #ifdef DEBUG
+#ifdef MY_DEBUG
     std::cout << "to del " << chunkFileName << std::endl;
     #endif
     boost::filesystem::path chunkPath=boost::filesystem::path(chunkFileName);
@@ -208,7 +207,7 @@ int File::glueChunks(const unsigned long threads) {
   }
   // Close output file.
   outputFile.close();
-  #ifdef DEBUG
+#ifdef MY_DEBUG
   std::cout << "File assembly complete!" << std::endl;
   #endif
   } else {
